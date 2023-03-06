@@ -1,39 +1,46 @@
 library(shiny)
-ui <- fluidPage(
-  titlePanel("Title Panel"),
-  sidebarLayout(
-    sidebarPanel(
-      helpText("Sidebar Panel")
-    ),
-    mainPanel(tabsetPanel(
-      tabPanel("tab1",
-               fluidRow(
-                 column(6,helpText("Col1")),
-                 column(6,
-                        helpText("Col2"),
-                        fluidRow(
-                          column(4,style="background-color:#b0c6fb",
-                                 helpText("Col1")
-                          ),
-                          column(4,style="background-color:#ffa153",
-                                 helpText("Col2")
-                          ),
-                          column(4,style="background-color:#b1f6c6",
-                                 helpText("Col3")
-                          )
-                        )
-                 )
-               )
-      ),
-      tabPanel("tab2",
-               inputPanel(helpText("Input Panel"))
-      ),
-      tabPanel("tab3",
-               wellPanel(helpText("Well Panel"))
-      )
-    )
-    )
-  )
-)
-server <- function(input,output){}
-shinyApp(ui=ui,server=server)
+library(shinyBS)
+ui <- fluidPage(titlePanel("ROH calculator"),
+                              mainPanel(
+                                tabsetPanel(
+                                  tabPanel("Input files",
+                                           helpText("Please select the input file format."),
+                                           tabsetPanel(
+                                             tabPanel(
+                                               "Binary format (.bed)",
+                                               
+                                               fileInput("bed_file", "Choose .bed file",
+                                                         accept = ".bed"),
+                                               fileInput("bim_file",
+                                                         "Choose .bim file",
+                                                         accept = ".bim"),
+                                               fileInput("fam_file",
+                                                         "Choose .fam file",
+                                                         accept = ".fam")
+                                             ),
+                                             tabPanel(
+                                               "PLINK format (.ped)",
+                                               fileInput("ped_file", "Choose .ped file",
+                                                         accept = ".ped"),
+                                               fileInput("map_file", "Choose .map file",
+                                                         accept = ".map")
+                                             )
+                                           )),
+                                  tabPanel("Configuration",
+                                           inputPanel(helpText("Input Panel")),
+                                           
+                                           bsButton(
+                                             inputId = "StartRunButtonlist(",
+                                             label = "Run",
+                                             icon = icon("play"), # Optional
+                                             style = "default",
+                                             size = "large",
+                                             disabled = TRUE
+                                           )),
+                                  tabPanel("tab3",
+                                           wellPanel(helpText("Well Panel")))
+                                )
+                              ))
+server <- function(input, output) {
+}
+shinyApp(ui = ui, server = server) 
