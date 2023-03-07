@@ -1,5 +1,14 @@
 import pandas as pd # 1.5.3
 
+# config
+# minimum length of ROH - it used for the window scanning
+min_roh = 10
+# max number of mismatches
+max_mismatch = 1
+
+
+print("Loading data...")
+
 # Loads ped file into a pandas dataframe
 indiv_ped = pd.read_table("Data/Example1/indiv.ped", sep="\t", header=None)
 
@@ -10,7 +19,7 @@ indiv_map = pd.read_table("Data/Example1/indiv.map", sep="\t", header=None)
 ref_ped = pd.read_table("Data/Example1/ref.ped", sep="\t", header=None)
 
 # Loads map file into a pandas dataframe
-red_map = pd.read_table("Data/Example1/ref.map", sep="\t", header=None)
+ref_map = pd.read_table("Data/Example1/ref.map", sep="\t", header=None)
 
 
 # this function sorts the snp column content
@@ -24,22 +33,53 @@ def order_snp (df):
     return df
 
 
+print("Sorting data...")
+#make temporary shorter ones
+indiv_ped = indiv_ped.iloc[:,0:50]
+ref_ped = ref_ped.iloc[:,0:50]
 # sort the ped files
 sorted_indiv_ped = order_snp(indiv_ped)
 sorted_ref_ped = order_snp(ref_ped)
 
 
 
-# now find loci with same genotype in both individuals and reference individuals
 
-for i in range(0, len(sorted_indiv_ped.columns)):
-    # this is the loci name
-    loci = sorted_indiv_ped.iloc[:,1][i-6]
-    # this is the genotype of the individual
-    indiv_genotype = sorted_indiv_ped.iloc[:,i][0]
-    # this is the genotype of the reference individual
-    ref_genotype = sorted_ref_ped.iloc[:,i][0]
-    # if the genotypes are the same
-    if indiv_genotype == ref_genotype:
-        # print the loci name
-        print(loci)
+
+# now find loci with same genotype in both individuals and reference individuals
+# craete empty dataframe with the matches
+matches = sorted_ref_ped.copy()
+# turn all loci to 1 ~ they'll become 0 if they match
+matches.iloc[:,6:] = 1
+# loops through every column
+print("Finding matches...")
+for row in range(0, len(sorted_ref_ped.index)):
+    pers = sorted_ref_ped.iloc[:, 6][row]
+    for loci in range(6, len(sorted_indiv_ped.columns)):
+
+        # this is the genotype of the individual
+        indiv_genotype = sorted_indiv_ped.iloc[:,loci][0]
+        # this is the genotype of the reference individual
+        ref_genotype = sorted_ref_ped.iloc[:,loci][row]
+        # print(pers, indiv_genotype, ref_genotype)
+        # if the genotypes are the same
+        if indiv_genotype == ref_genotype:
+            # match is 0 ~ 0 distance
+            matches.iloc[row, loci] = 0
+# print(matches)
+
+print("Finding ROH...")
+# scan for ROH with moving window
+num_loci = len(matches.columns) - 6 # number of loci
+print(num_loci)
+for row in range(0, len(sorted_ref_ped.index)): # for every individual
+    for start_pos in range(6, num_loci):
+        # if the window is not longer than the minimum ROH
+        if start_pos + min_roh <= num_loci:
+            # get the window sum
+            window = matches.iloc[row, start_pos:(start_pos + min_roh)]
+            # if the window has no mismatches
+            # print(row, window, window.values.tolist(), "window sum", window.sum())
+            if window.sum() <= max_mismatch: # mismatch limit
+                # print the start and end position of the ROH
+                print("ROH found")
+                print(row, start_pos, start_pos + min_roh)
