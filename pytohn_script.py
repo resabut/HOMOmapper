@@ -1,5 +1,5 @@
 import pandas as pd # 1.5.3
-
+import time
 # config
 # minimum length of ROH - it used for the window scanning
 min_roh = 100
@@ -26,13 +26,17 @@ ref_map = pd.read_table("Data/Example1/ref.map", sep="\t", header=None)
 
 # this function sorts the snp column content
 
-def order_snp (df):
+def optimize_function(df):
     # creates genotype cells
     # ignores the first 6 columns
-    # the rest of the columns are sorted to  eliminate genotype 13 and 31 ambiguity
-    df[df.columns[6:]] = df.iloc[:,6:].applymap(lambda x: int(''.join(sorted(x)).strip()) if isinstance(x, str) else x)
+    # the rest of the columns are sorted to eliminate genotype 13 and 31 ambiguity
+    df.loc[:, df.columns[6:]] = df.loc[:, df.columns[6:]].apply(
+        lambda x: x.astype(str).apply(lambda y: int(''.join(sorted(y)).strip())),
+        axis=1
+    )
     # returns the dataframe with the genotype data where each column is a loci
     return df
+
 
 
 print("Sorting data...")
@@ -41,10 +45,33 @@ if short_50:
     indiv_ped = indiv_ped.iloc[:,0:50]
     ref_ped = ref_ped.iloc[:,0:50]
 # sort the ped files
+start_time = time.time()
 sorted_indiv_ped = order_snp(indiv_ped)
 sorted_ref_ped = order_snp(ref_ped)
+end_time = time.time()
 
+execution_time = end_time - start_time
+print(f"New sorting: Execution time: {execution_time:.4f} seconds")
+def order_snp (df):
+    # creates genotype cells
+    # ignores the first 6 columns
+    # the rest of the columns are sorted to  eliminate genotype 13 and 31 ambiguity
+    df[df.columns[6:]] = df.iloc[:,6:].applymap(lambda x: int(''.join(sorted(x)).strip()) if isinstance(x, str) else x)
+    # returns the dataframe with the genotype data where each column is a loci
+    return df
+print("Sorting data...")
+#make temporary shorter ones
+if short_50:
+    indiv_ped = indiv_ped.iloc[:,0:50]
+    ref_ped = ref_ped.iloc[:,0:50]
+# sort the ped files
+start_time = time.time()
+sorted_indiv_ped = order_snp(indiv_ped)
+sorted_ref_ped = order_snp(ref_ped)
+end_time = time.time()
 
+execution_time = end_time - start_time
+print(f"Old sorting: Execution time: {execution_time:.4f} seconds")
 
 
 
