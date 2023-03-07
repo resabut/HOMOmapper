@@ -2,9 +2,11 @@ import pandas as pd # 1.5.3
 
 # config
 # minimum length of ROH - it used for the window scanning
-min_roh = 10
+min_roh = 100
 # max number of mismatches
 max_mismatch = 1
+# for testing, shorten ped files to 50 cols
+short_50 = False
 
 
 print("Loading data...")
@@ -35,8 +37,9 @@ def order_snp (df):
 
 print("Sorting data...")
 #make temporary shorter ones
-indiv_ped = indiv_ped.iloc[:,0:50]
-ref_ped = ref_ped.iloc[:,0:50]
+if short_50:
+    indiv_ped = indiv_ped.iloc[:,0:50]
+    ref_ped = ref_ped.iloc[:,0:50]
 # sort the ped files
 sorted_indiv_ped = order_snp(indiv_ped)
 sorted_ref_ped = order_snp(ref_ped)
@@ -72,6 +75,7 @@ print("Finding ROH...")
 num_loci = len(matches.columns) - 6 # number of loci
 print(num_loci)
 for row in range(0, len(sorted_ref_ped.index)): # for every individual
+    print("Individual", row)
     for start_pos in range(6, num_loci):
         # if the window is not longer than the minimum ROH
         if start_pos + min_roh <= num_loci:
