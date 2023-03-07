@@ -26,11 +26,11 @@ ref_map = pd.read_table("Data/Example1/ref.map", sep="\t", header=None)
 
 # this function sorts the snp column content
 
-def optimize_function(df):
+def order_snp(df):
     # creates genotype cells
     # ignores the first 6 columns
     # the rest of the columns are sorted to eliminate genotype 13 and 31 ambiguity
-    df.loc[:, df.columns[6:]] = df.loc[:, df.columns[6:]].apply(
+    df[df.columns[6:]]  = df[df.columns[6:]].apply(
         lambda x: x.astype(str).apply(lambda y: int(''.join(sorted(y)).strip())),
         axis=1
     )
