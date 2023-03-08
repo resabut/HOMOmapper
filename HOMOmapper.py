@@ -12,7 +12,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 # minimum length of ROH - it used for the window scanning
 min_roh = 15
 # max number of mismatches
-max_mismatch = 3
+max_mismatch = 1
 # for testing, shorten ped files to 50 cols
 short = True
 short_len = 10000
@@ -95,23 +95,23 @@ matches_df = find_matches(all_data_df)
 def find_roh(df):
     print("Finding ROH...")
     start_time = time.time()
-    for pair in range(2, len(df.index)):
-        print("Pair with individual", pair)
+    for pair in range(2, len(df.index)):  # number of pairwise comparisons
+        print("Pair with row", pair)
         for chr_nr in df.iloc[0, 6:].unique().tolist():
             print(df.iloc[0, 6:].unique().tolist())
             print("Chromosome", chr_nr)
-            # slice by chromosome
-            chr_df = df.iloc[df.iloc[0, :] == chr_nr]
-            print(chr_df)
+            trans_df = df.T # make a transposed copy to make the chromosome selection easier
+            chr_df = trans_df[trans_df["Chromosome"] == chr_nr].T # transpose again
+            # print(df.iloc[df.iloc[0, :] == chr_nr])
             num_loci = len(chr_df.columns[6:])
             print("Number of loci", num_loci)
             for start_pos in range(0, num_loci - min_roh):
                 # print("Start position", start_pos)
                 window = chr_df.iloc[pair, start_pos:start_pos + min_roh]
-                print(window)
+                # print(window)
                 if window.sum() <= max_mismatch:  # mismatch limit
                     print("Found ROH")
-                    print("Start position", start_pos)
+                    print(f"Start position in {chr_nr} in position {start_pos}")
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
 
