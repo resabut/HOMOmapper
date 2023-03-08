@@ -49,7 +49,7 @@ if short:
 
 
 # this function sorts the snp column content
-def order_snp(df):
+def OrderSNP(df):
     print("Sorting data...")
     start_time = time.time()
     # creates genotype cells
@@ -65,11 +65,11 @@ def order_snp(df):
 
 # sort the ped files
 
-all_data_df.iloc[1:, :] = order_snp(all_data_df.iloc[1:, :])
+all_data_df.iloc[1:, :] = OrderSNP(all_data_df.iloc[1:, :])
 
 
 # find matches
-def find_matches(df):
+def FindMatches(df):
     matches = df.copy()
     # turn all loci to 1 ~ they'll become 0 if they match
     matches.iloc[1:, 6:] = 1
@@ -88,11 +88,12 @@ def find_matches(df):
     return matches
 
 
-matches_df = find_matches(all_data_df)
+matches_df = FindMatches(all_data_df)
 
 
 # find homologous regions
-def find_roh(df):
+def FindROH(df):
+    roh_df = pd.DataFrame({"Pair": [], "Chromosome": [], "Start": [], "End": [], "Mismatch": []})
     print("Finding ROH...")
     start_time = time.time()
     for pair in range(2, len(df.index)):  # number of pairwise comparisons
@@ -110,10 +111,17 @@ def find_roh(df):
                 window = chr_df.iloc[pair, start_pos:start_pos + min_roh]
                 # print(window)
                 if window.sum() <= max_mismatch:  # mismatch limit
-                    print("Found ROH")
-                    print(f"Start position in {chr_nr} in position {start_pos}")
+                    # print("Found ROH")
+                    # print(f"Start position in {chr_nr} in position {start_pos}")
+                    new_row= pd.DataFrame({"Pair": pair, "Chromosome": chr_nr, "Start": start_pos,
+                                            "End": start_pos + min_roh, "Mismatch": window.sum()}, index=[0])
+                    roh_df = pd.concat([roh_df, new_row],
+                                        ignore_index=True)
+
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
+    return roh_df.astype(int)
 
 
-find_roh(matches_df)
+roh_df = FindROH(matches_df)
+
