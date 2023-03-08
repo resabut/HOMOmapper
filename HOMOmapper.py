@@ -7,7 +7,6 @@ import pandas as pd  # 1.5.3
 # remove false positve warning related to chained assignment
 pd.options.mode.chained_assignment = None  # default='warn'
 
-
 # config
 # minimum length of ROH - it used for the window scanning
 min_roh = 15
@@ -15,7 +14,7 @@ min_roh = 15
 max_mismatch = 1
 # for testing, shorten ped files to 50 cols
 short = True
-short_len = 10000
+short_len = 40000
 
 print("Loading data...")
 
@@ -49,7 +48,8 @@ if short:
 
 
 # this function sorts the snp column content
-def OrderSNP(df):
+def ordersnp(df):
+    print("------------------------------------")
     print("Sorting data...")
     start_time = time.time()
     # creates genotype cells
@@ -65,16 +65,18 @@ def OrderSNP(df):
 
 # sort the ped files
 
-all_data_df.iloc[1:, :] = OrderSNP(all_data_df.iloc[1:, :])
+all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
 
 
 # find matches
-def FindMatches(df):
+def find_matches(df):
+    print("------------------------------------")
+    print("Finding matches...")
     matches = df.copy()
     # turn all loci to 1 ~ they'll become 0 if they match
     matches.iloc[1:, 6:] = 1
     # find matches
-    print("Finding matches...")
+
     start_time = time.time()
     for pair in range(2, len(df.index)):  # number of pairwise comparisons
         # print(f"Pair {pair}")
@@ -88,40 +90,50 @@ def FindMatches(df):
     return matches
 
 
-matches_df = FindMatches(all_data_df)
+matches_df = find_matches(all_data_df)
 
 
 # find homologous regions
-def FindROH(df):
-    roh_df = pd.DataFrame({"Pair": [], "Chromosome": [], "Start": [], "End": [], "Mismatch": []})
+def find_roh(df):
+    print("------------------------------------")
     print("Finding ROH...")
+    roh_df_temp = pd.DataFrame({"Pair": [], "Chromosome": [], "Start": [], "End": [], "Mismatch": []})
     start_time = time.time()
     for pair in range(2, len(df.index)):  # number of pairwise comparisons
-        print("Pair with row", pair)
+        print("Comparing with", pair)
+        roh_found = 0
         for chr_nr in df.iloc[0, 6:].unique().tolist():
-            print(df.iloc[0, 6:].unique().tolist())
-            print("Chromosome", chr_nr)
-            trans_df = df.T # make a transposed copy to make the chromosome selection easier
-            chr_df = trans_df[trans_df["Chromosome"] == chr_nr].T # transpose again
+            # print("Chromosome", chr_nr)
+            trans_df = df.T  # make a transposed copy to make the chromosome selection easier
+            chr_df = trans_df[trans_df["Chromosome"] == chr_nr].T  # transpose again
             # print(df.iloc[df.iloc[0, :] == chr_nr])
             num_loci = len(chr_df.columns[6:])
-            print("Number of loci", num_loci)
+            # print("Number of loci", num_loci)
             for start_pos in range(0, num_loci - min_roh):
                 # print("Start position", start_pos)
                 window = chr_df.iloc[pair, start_pos:start_pos + min_roh]
                 # print(window)
                 if window.sum() <= max_mismatch:  # mismatch limit
                     # print("Found ROH")
+                    roh_found += 1
                     # print(f"Start position in {chr_nr} in position {start_pos}")
-                    new_row= pd.DataFrame({"Pair": pair, "Chromosome": chr_nr, "Start": start_pos,
-                                            "End": start_pos + min_roh, "Mismatch": window.sum()}, index=[0])
-                    roh_df = pd.concat([roh_df, new_row],
-                                        ignore_index=True)
+                    new_row = pd.DataFrame({"Pair": pair, "Chromosome": chr_nr, "Start": start_pos,
+                                            "End": start_pos + min_roh, "Mismatch": window.sum()},
+                                           index=[0])
+                    roh_df_temp = pd.concat([roh_df_temp, new_row],
+                                            ignore_index=True)
+        print(f"Found {roh_found} ROHs in pair {pair}.")
 
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
-    return roh_df.astype(int)
+    return roh_df_temp.astype(int)
 
 
-roh_df = FindROH(matches_df)
+roh_df = find_roh(matches_df)
+print("------------------------------------")
+print(roh_df)
 
+# join overlapping roh
+# find overlapping roh
+# join roh and evaluate number of mismatches
+# udpate roh table
