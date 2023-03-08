@@ -1,34 +1,77 @@
+#! /usr/bin/env python3
 """
-info
+usage: HOMOmapper.py [-h] -i INDIV -r REF -m MAP -o OUT
+Description: HOMOmapper is a tool for finding homologous regions between two
+individuals. It uses a reference individual to find homologous regions in the
+other individual. The reference individual can be a close relative of the
+individual of interest, or a population representative. The tool uses a
+sliding window approach to find homologous regions. The window size is set by
+
 """
 import time
 import pandas as pd  # 1.5.3
+import argparse
+from pathlib import Path
+import sys
 
 # remove false positve warning related to chained assignment
 pd.options.mode.chained_assignment = None  # default='warn'
 
+# Get argparse arguments
+parser = argparse.ArgumentParser(description='HOMOmapper')
+parser.add_argument('-i', '--indiv', help='Individual ped file', metavar="indiv_ped",
+                    type=Path, required=True)
+parser.add_argument('-r', '--ref', help='Reference ped file', metavar="ref_ped",
+                    type=Path, required=True)
+parser.add_argument('-o', '--out', help='Output file', metavar="output_txt", type=Path,
+                    default="out_roh_table.txt", required=False)
+parser.add_argument('-s', '--short', action="store_true", help='Shorten ped files. Useful for testing', required=False)
+parser.add_argument('-sl', '--short_len',
+                    help='Number of columns (Phenotype + genotype data) to be kept in the shortened ped files. \
+                    By default, 500 columns. Useful for testing',
+                    type=int, default=500, required=False)
+parser.add_argument('-l', '--min-roh-length',
+                    help='Minimum ROH length. It is used for the length of the sliding window',
+                    type=int, required=True)
+parser.add_argument('-m', '--max-mismatch', help='Maximum number of mismatches within an ROH.',
+                    type=int, required=True)
+args = parser.parse_args()
+
 # config
-# minimum length of ROH - it used for the window scanning
-min_roh = 15
+# minimum length of ROH
+min_roh = args.min_roh_length
 # max number of mismatches
-max_mismatch = 1
-# for testing, shorten ped files to 50 cols
-short = True
-short_len = 40000
+max_mismatch = args.max_mismatch
 
 print("Loading data...")
 
+
+# find the corresponding map file
+def find_map_file(ped_file):
+    map_file = ped_file.with_suffix(".map")  # check fi it works with ped file
+    if Path(map_file).is_file():
+        print(f"Map file {map_file.name} found. Continuing...")
+    else:
+        print(f"Map file {map_file.name} not found.\nPlease, make sure that the .map file is in the same path folder \
+        as the .ped file and has the same name. Then, run again.\nExiting...")
+        sys.exit()
+    return map_file
+
+
+ind_map_file = find_map_file(args.indiv)
+ref_map_file = find_map_file(args.ref)
+
 # Loads ped file into a pandas dataframe
-indiv_ped = pd.read_table("Data/Example1/indiv.ped", sep="\t", header=None)
+indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
 
 # Loads map file into a pandas dataframe
-indiv_map = pd.read_table("Data/Example1/indiv.map", sep="\t", header=None)
+indiv_map = pd.read_table(ind_map_file, sep="\t", header=None)
 
 # Loads ped file into a pandas dataframe
-ref_ped = pd.read_table("Data/Example1/ref.ped", sep="\t", header=None)
+ref_ped = pd.read_table(args.ref, sep="\t", header=None)
 
 # Loads map file into a pandas dataframe
-ref_map = pd.read_table("Data/Example1/ref.map", sep="\t", header=None)
+ref_map = pd.read_table(ref_map_file, sep="\t", header=None)
 
 # check if map files are the same
 print("Adding chromosome information...")
@@ -42,9 +85,9 @@ indiv_ped.rename(index={0: "Ind"}, inplace=True)
 # concate the chromosome row and the two ped files
 all_data_df = pd.concat([chr_row, indiv_ped, ref_ped], axis=0)
 # make temporary shorter ones, if preferred
-if short:
+if args.short:
     print("Shortening data...")
-    all_data_df = all_data_df.iloc[:, 0:short_len]
+    all_data_df = all_data_df.iloc[:, 0:args.short_len]
 
 
 # this function sorts the snp column content
@@ -97,10 +140,14 @@ matches_df = find_matches(all_data_df)
 def find_roh(df):
     print("------------------------------------")
     print("Finding ROH...")
-    roh_df_temp = pd.DataFrame({"Pair": [], "Chromosome": [], "Start": [], "End": [], "Mismatch": []})
+    roh_df_temp = pd.DataFrame({"Pair": [], "Chromosome": [], "SNP-Start": [], "SNP-End": [], "Mismatch": []})
+    indiv_str = "-".join([str(x) for x in df.iloc[1, 0:2].tolist()])
+    # print(indiv_str)
     start_time = time.time()
     for pair in range(2, len(df.index)):  # number of pairwise comparisons
-        print("Comparing with", pair)
+        ref_str = "-".join([str(x) for x in df.iloc[pair, 0:2].tolist()])
+        pair_str = ";".join([indiv_str, ref_str])
+        print("Comparing ", pair_str)
         roh_found = 0
         for chr_nr in df.iloc[0, 6:].unique().tolist():
             # print("Chromosome", chr_nr)
@@ -117,22 +164,24 @@ def find_roh(df):
                     # print("Found ROH")
                     roh_found += 1
                     # print(f"Start position in {chr_nr} in position {start_pos}")
-                    new_row = pd.DataFrame({"Pair": pair, "Chromosome": chr_nr, "Start": start_pos,
-                                            "End": start_pos + min_roh, "Mismatch": window.sum()},
+                    new_row = pd.DataFrame({"Pair": pair_str, "Chromosome": chr_nr, "SNP-Start": start_pos,
+                                            "SNP-End": start_pos + min_roh, "Mismatch": window.sum()},
                                            index=[0])
                     roh_df_temp = pd.concat([roh_df_temp, new_row],
                                             ignore_index=True)
-        print(f"Found {roh_found} ROHs in pair {pair}.")
+        print(f"Found {roh_found} ROHs in pair {pair_str}.")
 
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
-    return roh_df_temp.astype(int)
+    roh_df_temp.iloc[:, 1:] = roh_df_temp.iloc[:, 1:].astype(int)
+    return roh_df_temp
 
 
 roh_df = find_roh(matches_df)
 print("------------------------------------")
 print(roh_df)
 
+print("Done.")
 # join overlapping roh
 # find overlapping roh
 # join roh and evaluate number of mismatches
