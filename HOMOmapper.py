@@ -140,7 +140,7 @@ matches_df = find_matches(all_data_df)
 def find_roh(df):
     print("------------------------------------")
     print("Finding ROH...")
-    roh_df_temp = pd.DataFrame({"Pair": [], "Chromosome": [], "SNP-Start": [], "SNP-End": [], "Mismatch": []})
+    roh_df_temp = pd.DataFrame({"Pair": [], "Chromosome": [], "First_SNP": [], "Last_SNP": [], "Mismatch": [], "Original_row": []})
     indiv_str = "-".join([str(x) for x in df.iloc[1, 0:2].tolist()])
     # print(indiv_str)
     start_time = time.time()
@@ -164,8 +164,9 @@ def find_roh(df):
                     # print("Found ROH")
                     roh_found += 1
                     # print(f"Start position in {chr_nr} in position {start_pos}")
-                    new_row = pd.DataFrame({"Pair": pair_str, "Chromosome": chr_nr, "SNP-Start": start_pos,
-                                            "SNP-End": start_pos + min_roh, "Mismatch": window.sum()},
+                    new_row = pd.DataFrame({"Pair": pair_str, "Chromosome": chr_nr, "First_SNP": start_pos,
+                                            "Last_SNP": start_pos + min_roh, "Mismatch": window.sum(),
+                                            "Original_row": pair},
                                            index=[0])
                     roh_df_temp = pd.concat([roh_df_temp, new_row],
                                             ignore_index=True)
@@ -181,8 +182,19 @@ roh_df = find_roh(matches_df)
 print("------------------------------------")
 print(roh_df)
 
-print("Done.")
+
 # join overlapping roh
 # find overlapping roh
-# join roh and evaluate number of mismatches
-# udpate roh table
+def find_overlap_roh(df):
+
+    df['overlap'] = df['Last_SNP'] - df['First_SNP'].shift(-1)
+    # if overlap is positive, then the roh are overlapping. If it is 0, they are contiguous
+    roh_candidates = df[df['overlap'] >= 0]
+    print(roh_candidates)
+
+    # join roh and evaluate number of mismatches
+    # udpate roh table
+find_overlap_roh(roh_df)
+
+
+print("Done.")
