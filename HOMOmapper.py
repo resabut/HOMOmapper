@@ -155,9 +155,7 @@ def find_matches(df):
 
 
 matches_df = find_matches(all_data_df)
-
-
-# print(matches_df)
+print(matches_df)
 
 # find homologous regions
 def find_roh(df):
@@ -208,7 +206,7 @@ def find_roh(df):
 preroh_df = find_roh(matches_df)
 
 
-# print(preroh_df)
+print(preroh_df)
 
 
 # join overlapping roh
@@ -225,7 +223,6 @@ def find_overlap_roh(df):
 
 
 # find_overlap_roh(roh_df)
-# print(len(matches_df.T[matches_df.T['Chromosome'] <=8].T))
 # extend the existing roh until threshold
 def extend_roh(roh_df, match_df, mismatch_threshold):
     print("------------------------------------")
@@ -236,9 +233,10 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     # extend roh
     # loop through every roh, every row
     for index, roh in roh_df.iterrows():
+
         # print("ROH")
         # print(roh)
-        # print("Extending ROH", index)
+        print("Extending ROH", index)
         up_limit = False
         down_limit = False
         while roh['Mismatch'] <= mismatch_threshold:
@@ -266,7 +264,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
             # calc mismatch vals for new positions
             up_mismatch = chr_df.iloc[roh['Original_row'], new_first_snp]  # upstream
             down_mismatch = chr_df.iloc[roh['Original_row'], new_last_snp - 1]  # downstream
-
+            print("Got downstream and upstream mismatch values")
             # evaluate the mismatch values
             if up_mismatch == 0:  # the snp upstream is a match
                 # print("good up")
@@ -317,9 +315,9 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     # break the loop
                     break
             # update roh table
-
             roh_df.iloc[index, :] = roh
             # print(roh)
+        print("Done extending ROH", index)
     end_time = time.time()
     print(f"Time to extend ROH: {end_time - start_time:.4f}")
     return roh_df
