@@ -6,11 +6,24 @@ individuals. It uses a reference individual to find homologous regions in the
 other individual. The reference individual can be a close relative of the
 individual of interest, or a population representative. The tool uses a
 sliding window approach to find homologous regions. The window size is set by
+the minimum ROH length. The maximum number of mismatches within the window is
+set by the user. The tool outputs a table with the start and end position of
+the ROHs, the chromosome, the number of mismatches and the length of the ROH.
+positional arguments:
+    indiv_ped             Individual ped file
+    ref_ped               Reference ped file
+optional arguments:
+    -h, --help            show this help message and exit
+    -o output_txt, --out output_txt
+                            Output file (default: out_roh_table.txt)
+    -s, --short           Shorten ped files. Useful for testing
+    -sl short_len, --short_len short_len
+                            Number of columns (Phenotype + genotype data) to be kept in the shortened ped files. By default, 500 columns. Useful for testing (default: 500)
+    -l min_roh_length, --min-roh-length min_roh_length
+                            Minimum ROH length. It is used for the length of the sliding window (default: 100)
+    -m max_mismatch, --max-mismatch max_mismatch
+                            Maximum number of mismatches within the sliding window (default: 5)
 
-Description: HOMOmapper is a tool for finding homologous regions between two
-individuals. It uses a reference individual to find homologous regions in the
-other individual. The reference individual can be a close relative of the
-individual of interest, or a population representative. The tool uses a
 """
 import random
 import time
@@ -94,9 +107,10 @@ all_data_df = pd.concat([chr_row, indiv_ped, ref_ped], axis=0)
 if args.short:
     print("Shortening data...")
     all_data_df = all_data_df.iloc[:, 0:args.short_len]
-elif args.short_len != 500: # the user has specified a length but not the short option
-    print("Ignoring short length option. Please, use the -s option to shorten the data.")
+elif args.short_len != 500:  # the user has specified a length but not the short option
+    print("\033[1mIgnoring short length option. Please, use the -s option to shorten the data.\033[0m")
     print("Continuing...")
+
 
 # this function sorts the snp column content
 def ordersnp(df):
@@ -141,6 +155,8 @@ def find_matches(df):
 
 
 matches_df = find_matches(all_data_df)
+
+
 # print(matches_df)
 
 # find homologous regions
@@ -155,7 +171,7 @@ def find_roh(df):
     for pair in range(2, len(df.index)):  # number of pairwise comparisons
         ref_str = "-".join([str(x) for x in df.iloc[pair, 0:2].tolist()])
         pair_str = ";".join([indiv_str, ref_str])
-        print("Comparing ", pair_str)
+        # print("Comparing ", pair_str)
         roh_found = 0
         for chr_nr in df.iloc[0, 6:].unique().tolist():
             # print("Chromosome", chr_nr)
@@ -190,6 +206,8 @@ def find_roh(df):
 
 
 preroh_df = find_roh(matches_df)
+
+
 # print(preroh_df)
 
 
@@ -247,7 +265,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                 new_last_snp = num_loci
             # calc mismatch vals for new positions
             up_mismatch = chr_df.iloc[roh['Original_row'], new_first_snp]  # upstream
-            down_mismatch = chr_df.iloc[roh['Original_row'], new_last_snp-1]  # downstream
+            down_mismatch = chr_df.iloc[roh['Original_row'], new_last_snp - 1]  # downstream
 
             # evaluate the mismatch values
             if up_mismatch == 0:  # the snp upstream is a match
@@ -272,7 +290,8 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     # print("good up")
                     roh['First_SNP'] = new_first_snp
                     roh['Mismatch'] = roh["Mismatch"] + up_mismatch
-                elif down_limit:  # the snp upstream is a mismatch and the threshold is exceeded and the downstream limit is reached
+                elif down_limit:  # the snp upstream is a mismatch and the threshold is exceeded
+                    # and the downstream limit is reached
                     # no more extension possible
                     break
 
@@ -291,7 +310,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     elif not down_limit:  # down and downstream limit not reached
                         roh['Last_SNP'] = new_last_snp
                         roh['Mismatch'] = roh["Mismatch"] + down_mismatch
-                    else: # both limits reached, no extension is possible
+                    else:  # both limits reached, no extension is possible
                         # break the loop
                         break
                 else:  # extending both ends exceeds the threshold, no extension is possible
@@ -309,6 +328,19 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
 extended_roh_df = extend_roh(preroh_df, matches_df, max_mismatch)
 print(extended_roh_df)
 
+# eliminate duplicate roh
+def eliminate_duplicate_roh(df):
+    print("------------------------------------")
+    print("Eliminating duplicate ROH...")
+    start_time = time.time()
+    df = df.drop_duplicates(subset=['Pair', 'Chromosome', 'First_SNP', 'Last_SNP'], keep='first')
+    end_time = time.time()
+    print(f"Time to eliminate duplicate ROH: {end_time - start_time:.4f}")
+    return df
+
+
+clean_roh_df = eliminate_duplicate_roh(extended_roh_df)
+print(clean_roh_df)
 
 print("------------------------------------")
 end_total_time = time.time()
