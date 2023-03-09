@@ -42,6 +42,7 @@ parser.add_argument('-m', '--max-mismatch', help='Maximum number of mismatches w
                     type=int, required=True)
 args = parser.parse_args()
 
+start_total_time = time.time()
 # config
 # minimum length of ROH
 min_roh = args.min_roh_length
@@ -93,6 +94,9 @@ all_data_df = pd.concat([chr_row, indiv_ped, ref_ped], axis=0)
 if args.short:
     print("Shortening data...")
     all_data_df = all_data_df.iloc[:, 0:args.short_len]
+elif args.short_len != 500: # the user has specified a length but not the short option
+    print("Ignoring short length option. Please, use the -s option to shorten the data.")
+    print("Continuing...")
 
 # this function sorts the snp column content
 def ordersnp(df):
@@ -137,15 +141,14 @@ def find_matches(df):
 
 
 matches_df = find_matches(all_data_df)
-print(matches_df)
+# print(matches_df)
 
 # find homologous regions
 def find_roh(df):
     print("------------------------------------")
     print("Finding ROH...")
     roh_df_temp = pd.DataFrame(
-        {"Pair": [], "Chromosome": [], "First_SNP": [], "Last_SNP": [], "Mismatch": [], "Original_row": [],
-         "Sequence": []})
+        {"Pair": [], "Chromosome": [], "First_SNP": [], "Last_SNP": [], "Mismatch": [], "Original_row": []})
     indiv_str = "-".join([str(x) for x in df.iloc[1, 0:2].tolist()])
     # print(indiv_str)
     start_time = time.time()
@@ -174,7 +177,7 @@ def find_roh(df):
                     new_row = pd.DataFrame(
                         {"Pair": pair_str, "Chromosome": chr_nr, "First_SNP": start_pos,  # it starts at 0
                          "Last_SNP": start_pos + min_roh, "Mismatch": window.sum(),
-                         "Original_row": pair, "Sequence": "".join([str(x) for x in window.values.tolist()])},
+                         "Original_row": pair},
                         index=[0])
                     roh_df_temp = pd.concat([roh_df_temp, new_row],
                                             ignore_index=True)
@@ -187,8 +190,7 @@ def find_roh(df):
 
 
 preroh_df = find_roh(matches_df)
-print("------------------------------------")
-print(preroh_df)
+# print(preroh_df)
 
 
 # join overlapping roh
@@ -210,6 +212,7 @@ def find_overlap_roh(df):
 def extend_roh(roh_df, match_df, mismatch_threshold):
     print("------------------------------------")
     print("Extending ROH...")
+    start_time = time.time()
     # find roh that are not overlapping
     # find roh that are overlapping
     # extend roh
@@ -217,7 +220,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     for index, roh in roh_df.iterrows():
         # print("ROH")
         # print(roh)
-        print("Extending ROH", index)
+        # print("Extending ROH", index)
         up_limit = False
         down_limit = False
         while roh['Mismatch'] <= mismatch_threshold:
@@ -235,11 +238,11 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
             new_last_snp = roh['Last_SNP'] + 1
             # check that the snp are within the chromosome
             if new_first_snp < 0:
-                print("First SNP is out of range")
+                # print("First SNP is out of range")
                 up_limit = True
                 new_first_snp = 0  # reset position
             elif new_last_snp > num_loci:
-                print("Last SNP is out of range")
+                # print("Last SNP is out of range")
                 down_limit = True
                 new_last_snp = num_loci
             # calc mismatch vals for new positions
@@ -298,11 +301,17 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
 
             roh_df.iloc[index, :] = roh
             # print(roh)
-
+    end_time = time.time()
+    print(f"Time to extend ROH: {end_time - start_time:.4f}")
     return roh_df
 
 
 extended_roh_df = extend_roh(preroh_df, matches_df, max_mismatch)
 print(extended_roh_df)
 
+
+print("------------------------------------")
+end_total_time = time.time()
+
+print(f"Total time: {end_total_time - start_total_time:.4f}")
 print("Done.")
