@@ -94,7 +94,6 @@ if args.short:
     print("Shortening data...")
     all_data_df = all_data_df.iloc[:, 0:args.short_len]
 
-
 # this function sorts the snp column content
 def ordersnp(df):
     print("------------------------------------")
@@ -112,7 +111,6 @@ def ordersnp(df):
 
 
 # sort the ped files
-
 all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
 
 
@@ -139,14 +137,15 @@ def find_matches(df):
 
 
 matches_df = find_matches(all_data_df)
-
+print(matches_df)
 
 # find homologous regions
 def find_roh(df):
     print("------------------------------------")
     print("Finding ROH...")
     roh_df_temp = pd.DataFrame(
-        {"Pair": [], "Chromosome": [], "First_SNP": [], "Last_SNP": [], "Mismatch": [], "Original_row": []})
+        {"Pair": [], "Chromosome": [], "First_SNP": [], "Last_SNP": [], "Mismatch": [], "Original_row": [],
+         "Sequence": []})
     indiv_str = "-".join([str(x) for x in df.iloc[1, 0:2].tolist()])
     # print(indiv_str)
     start_time = time.time()
@@ -160,12 +159,14 @@ def find_roh(df):
             trans_df = df.T  # make a transposed copy to make the chromosome selection easier
             chr_df = trans_df[trans_df["Chromosome"] == chr_nr].T  # transpose again
             # print(df.iloc[df.iloc[0, :] == chr_nr])
-            num_loci = len(chr_df.columns[6:])
+            num_loci = len(chr_df.columns)
             # print("Number of loci", num_loci)
             for start_pos in range(0, num_loci - min_roh):
                 # print("Start position", start_pos)
                 window = chr_df.iloc[pair, start_pos:start_pos + min_roh]
                 # print(window)
+                # print the window values
+
                 if window.sum() <= max_mismatch:  # mismatch limit
                     # print("Found ROH")
                     roh_found += 1
@@ -173,7 +174,7 @@ def find_roh(df):
                     new_row = pd.DataFrame(
                         {"Pair": pair_str, "Chromosome": chr_nr, "First_SNP": start_pos,  # it starts at 0
                          "Last_SNP": start_pos + min_roh, "Mismatch": window.sum(),
-                         "Original_row": pair},
+                         "Original_row": pair, "Sequence": "".join([str(x) for x in window.values.tolist()])},
                         index=[0])
                     roh_df_temp = pd.concat([roh_df_temp, new_row],
                                             ignore_index=True)
@@ -207,6 +208,8 @@ def find_overlap_roh(df):
 # print(len(matches_df.T[matches_df.T['Chromosome'] <=8].T))
 # extend the existing roh until threshold
 def extend_roh(roh_df, match_df, mismatch_threshold):
+    print("------------------------------------")
+    print("Extending ROH...")
     # find roh that are not overlapping
     # find roh that are overlapping
     # extend roh
@@ -214,62 +217,87 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     for index, roh in roh_df.iterrows():
         # print("ROH")
         # print(roh)
-
-        while roh['Mismatch'] < mismatch_threshold:
+        print("Extending ROH", index)
+        up_limit = False
+        down_limit = False
+        while roh['Mismatch'] <= mismatch_threshold:
             # print("Extending ROH", index)
-            extend = False  # reset the extend flag
 
             # get the chr subset
             trans_df = match_df.T  # make a transposed copy to make the chromosome selection easier
             chr_df = trans_df[trans_df["Chromosome"] == roh["Chromosome"]].T  # transpose again
-            num_loci = len(chr_df.columns[6:])
+            num_loci = len(chr_df.columns)
 
             # extend roh
+
             # new limits
             new_first_snp = roh['First_SNP'] - 1
             new_last_snp = roh['Last_SNP'] + 1
             # check that the snp are within the chromosome
             if new_first_snp < 0:
-                new_first_snp = 0
+                print("First SNP is out of range")
+                up_limit = True
+                new_first_snp = 0  # reset position
             elif new_last_snp > num_loci:
+                print("Last SNP is out of range")
+                down_limit = True
                 new_last_snp = num_loci
             # calc mismatch vals for new positions
             up_mismatch = chr_df.iloc[roh['Original_row'], new_first_snp]  # upstream
-            down_mismatch = chr_df.iloc[roh['Original_row'], new_last_snp]  # downstream
+            down_mismatch = chr_df.iloc[roh['Original_row'], new_last_snp-1]  # downstream
+
             # evaluate the mismatch values
             if up_mismatch == 0:  # the snp upstream is a match
                 # print("good up")
-                # it doesn't matter if the down is good or not,
-                # the while forces it to be at least one mismatch under the threshold,
-                # so the roh is extended
-                extend = True
-            elif down_mismatch == 0:  # the snp downstream is a match
-                # print("good down")
-                # idem
-                extend = True
+                roh['First_SNP'] = new_first_snp
+                # no need to update mismatch, since up mismatch is 0
+                if down_mismatch == 0 or roh["Mismatch"] + 1 <= mismatch_threshold:
+                    # the snp downstream is a match too or the threshold is not exceeded (if it is mismatch)
+                    # print("good down")
+                    roh['Last_SNP'] = new_last_snp
+                    roh['Mismatch'] = roh["Mismatch"] + down_mismatch  # update mismatch in case it is 1
+                elif up_limit:  # the snp downstream is a mismatch and the threshold is exceeded and the upstream limit is reached
+                    # print("bad down")
+                    break
+            elif down_mismatch == 0:  # the snp downstream is a match, but the upstream is a mismatch
+                # print("only good down")
+                # extend only the downstream
+                roh['Last_SNP'] = new_last_snp
+                # no need to update mismatch, since down mismatch is 0
+                if roh["Mismatch"] + 1 <= mismatch_threshold:
+                    # the snp upstream is a match too or the threshold is not exceeded (if it is mismatch)
+                    # print("good up")
+                    roh['First_SNP'] = new_first_snp
+                    roh['Mismatch'] = roh["Mismatch"] + up_mismatch
+                elif down_limit:  # the snp upstream is a mismatch and the threshold is exceeded and the downstream limit is reached
+                    # no more extension possible
+                    break
+
             else:  # both ends are mismatches
                 # check if the new limits are within the threshold
                 if roh["Mismatch"] + 2 <= mismatch_threshold:
                     # Can extend both ends under the threshold
-                    extend = True
-                else:  # both ends are mismatches, so extending both ends would exceed the threshold
+                    roh['First_SNP'] = new_first_snp
+                    roh['Last_SNP'] = new_last_snp
+                    roh['Mismatch'] = roh["Mismatch"] + up_mismatch + down_mismatch
+                elif roh["Mismatch"] + 1 <= mismatch_threshold:  # extending both ends exceeds the threshold, but one doesn't
                     # extend only one end, choose randomly
-                    if random.randint(0, 1):  # up
+                    if random.randint(0, 1) and not up_limit:  # up, and upstream limit not reached
                         roh['First_SNP'] = new_first_snp
                         roh['Mismatch'] = roh["Mismatch"] + up_mismatch
-                    else:  # down
+                    elif not down_limit:  # down and downstream limit not reached
                         roh['Last_SNP'] = new_last_snp
                         roh['Mismatch'] = roh["Mismatch"] + down_mismatch
+                    else: # both limits reached, no extension is possible
+                        # break the loop
+                        break
+                else:  # extending both ends exceeds the threshold, no extension is possible
+                    # break the loop
+                    break
+            # update roh table
 
-                    # update roh table
-                    roh_df.iloc[index, :] = roh
-            if extend:
-                roh['First_SNP'] = new_first_snp
-                roh['Last_SNP'] = new_last_snp
-                roh['Mismatch'] = roh["Mismatch"] + up_mismatch + down_mismatch
-                # update roh table
-                roh_df.iloc[index, :] = roh
-                # print(roh)
+            roh_df.iloc[index, :] = roh
+            # print(roh)
 
     return roh_df
 
