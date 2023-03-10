@@ -351,6 +351,9 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                 break
             # print(roh)
         # print("Done extending ROH", index)
+
+    # also remove the original row column
+    roh_df = roh_df.drop(columns=['Original_row'])
     end_time = time.time()
     print(f"Time to extend ROH: {end_time - start_time:.4f}")
     return roh_df
@@ -390,8 +393,9 @@ def find_genome_position(df, map_df):
         # print(map_df.iloc[roh['First_SNP'], 3])
         # print(map_df.iloc[roh['Last_SNP'], 3])
         # print()
-        df.loc[index, 'First_Genome_Pos'] = map_df.iloc[roh['First_SNP'], 3]
-        df.loc[index, 'Last_Genome_Pos'] = map_df.iloc[roh['Last_SNP'], 3]
+        df.loc[index, 'First_Genome_Pos'] = int(map_df.iloc[roh['First_SNP'], 3])
+        df.loc[index, 'Last_Genome_Pos'] = int(map_df.iloc[roh['Last_SNP'], 3])
+
         # print(df.loc[roh[0], 'First_Genome_Pos'])
         # print(df.loc[roh[0], 'Last_Genome_Pos'])
         # print()
@@ -403,6 +407,16 @@ final_df = find_genome_position(clean_roh_df, indiv_map)
 print(final_df)
 
 
+# save to file
+def save_to_file(df, filename):
+    print("------------------------------------")
+    print("Saving to file...")
+    start_time = time.time()
+    df.to_csv(filename, sep='\t', index=False)
+    end_time = time.time()
+    print(f"Time to save to file: {end_time - start_time:.4f}")
+
+save_to_file(final_df, args.out)
 
 print("------------------------------------")
 end_total_time = time.time()
