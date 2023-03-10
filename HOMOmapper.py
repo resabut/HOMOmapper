@@ -32,6 +32,7 @@ import argparse
 from pathlib import Path
 import sys
 from tqdm import tqdm
+import subprocess
 
 # remove false positve warning related to chained assignment
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -54,6 +55,9 @@ parser.add_argument('-l', '--min-roh-length',
                     type=int, required=True)
 parser.add_argument('-m', '--max-mismatch', help='Maximum number of mismatches within an ROH.',
                     type=int, required=True)
+parser.add_argument('-b', '--bash', action="store_true", help='Use bash to sort ped files. '
+                                                              'Faster but requires UNIX', required=False)
+
 args = parser.parse_args()
 
 start_total_time = time.time()
@@ -64,6 +68,8 @@ min_roh = args.min_roh_length
 max_mismatch = args.max_mismatch
 
 print("Loading data...")
+
+
 
 
 # find the corresponding map file
@@ -81,6 +87,22 @@ def find_map_file(ped_file):
 ind_map_file = find_map_file(args.indiv)
 ref_map_file = find_map_file(args.ref)
 
+# Faster way with bash
+if args.bash:
+    print("Sorting ped files with bash... (Used -b/--bash option)")
+    # Define the Bash command to run, including the user input
+    bash_command_indiv = "awk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
+                         + str(args.indiv) + " | tr ' ' '\t' > temp_ind.ped"  # it is a  Path object
+    bash_command_ref = "awk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
+                       + str(args.ref) + " | tr ' ' '\t' > temp_ref.ped"  # it is a  Path object
+
+    # Run the Bash command and capture its output
+    a = subprocess.check_output(bash_command_indiv, shell=True)
+    b = subprocess.check_output(bash_command_ref, shell=True)
+    # print(sorted)
+    args.indiv = Path("temp_ind.ped")
+    args.ref = Path("temp_ref.ped")
+
 # Loads ped file into a pandas dataframe
 indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
 
@@ -92,6 +114,7 @@ ref_ped = pd.read_table(args.ref, sep="\t", header=None)
 
 # Loads map file into a pandas dataframe
 ref_map = pd.read_table(ref_map_file, sep="\t", header=None)
+
 
 # check if map files are the same
 print("Adding chromosome information...")
@@ -111,7 +134,7 @@ if args.short:
 elif args.short_len != 500:  # the user has specified a length but not the short option
     print("\033[1mIgnoring short length option. Please, use the -s option to shorten the data.\033[0m")
     print("Continuing...")
-
+print(all_data_df)
 
 # this function sorts the snp column content
 def ordersnp(df):
@@ -128,9 +151,9 @@ def ordersnp(df):
     print(f"Time to sort data: {end_time - start_time:.4f}")
     return df
 
-
-# sort the ped files
-all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
+if not args.bash: # if not using bash, sort the ped files with pandas
+    # sort the ped files
+    all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
 
 
 # find matches
@@ -143,7 +166,7 @@ def find_matches(df):
     # find matches
 
     start_time = time.time()
-    for pair in tqdm(range(2, len(df.index)), ascii="░▒█", leave=True):  # number of pairwise comparisons
+    for pair in tqdm(range(2, len(df.index)), ascii="░▒█", leave=False):  # number of pairwise comparisons
         # print(f"Pair {pair}")
         for snp in range(6, len(df.columns)):  # number of snp
             # print(f"SNP number {snp}")
@@ -167,7 +190,7 @@ def find_roh(df):
     indiv_str = "-".join([str(x) for x in df.iloc[1, 0:2].tolist()])
     # print(indiv_str)
     start_time = time.time()
-    for pair in tqdm(range(2, len(df.index)), ascii="░▒█", leave=True):  # number of pairwise comparisons
+    for pair in tqdm(range(2, len(df.index)), ascii="░▒█", leave=False):  # number of pairwise comparisons
         ref_str = "-".join([str(x) for x in df.iloc[pair, 0:2].tolist()])
         pair_str = ";".join([indiv_str, ref_str])
         # print("Comparing ", pair_str)
@@ -233,7 +256,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     # find roh that are overlapping
     # extend roh
     # loop through every roh, every row
-    for index, roh in tqdm(roh_df.iterrows(), ascii="░▒█", total=len(roh_df.index), leave=True):
+    for index, roh in tqdm(roh_df.iterrows(), ascii="░▒█", leave=False):
 
         # print("ROH")
         # print(roh)
@@ -350,6 +373,34 @@ def eliminate_duplicate_roh(df):
 clean_roh_df = eliminate_duplicate_roh(extended_roh_df)
 print(clean_roh_df)
 
+print(indiv_map)
+# find genome position
+def find_genome_position(df, map_df):
+    print("------------------------------------")
+    print("Finding genome position...")
+    start_time = time.time()
+
+    chr_loci_counts = map_df.iloc[:, 0].value_counts().sort_index()
+    for index, roh in tqdm(df.iterrows(), ascii="░▒█", leave=False):
+        # print(roh)
+        # print(roh['Chromosome'])
+        # print(chr_loci_counts[roh['Chromosome']])
+        # print(roh['First_SNP'])
+        # print(roh['Last_SNP'])
+        # print(map_df.iloc[roh['First_SNP'], 3])
+        # print(map_df.iloc[roh['Last_SNP'], 3])
+        # print()
+        df.loc[index, 'First_Genome_Pos'] = map_df.iloc[roh['First_SNP'], 3]
+        df.loc[index, 'Last_Genome_Pos'] = map_df.iloc[roh['Last_SNP'], 3]
+        # print(df.loc[roh[0], 'First_Genome_Pos'])
+        # print(df.loc[roh[0], 'Last_Genome_Pos'])
+        # print()
+    end_time = time.time()
+    print(f"Time to find genome position: {end_time - start_time:.4f}")
+    return df
+
+final_df = find_genome_position(clean_roh_df, indiv_map)
+print(final_df)
 
 
 
