@@ -257,14 +257,20 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                 # print("First SNP is out of range")
                 up_limit = True
                 new_first_snp = 0  # reset position
-            elif new_last_snp > num_loci:
+            if new_last_snp > num_loci:
                 # print("Last SNP is out of range")
                 down_limit = True
                 new_last_snp = num_loci
             # calc mismatch vals for new positions
+            #check for NA values
+            # print("Checking for NA values")
+            # print(chr_df.isna(), chr_df.isnull())
+            # print(num_loci)
+
             up_mismatch = chr_df.iloc[roh['Original_row'], new_first_snp]  # upstream
             down_mismatch = chr_df.iloc[roh['Original_row'], new_last_snp - 1]  # downstream
-            print("Got downstream and upstream mismatch values")
+            # print("Got downstream and upstream mismatch values")
+            # print()
             # evaluate the mismatch values
             if up_mismatch == 0:  # the snp upstream is a match
                 # print("good up")
@@ -316,6 +322,9 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     break
             # update roh table
             roh_df.iloc[index, :] = roh
+            # check if both ends of the chromosome have been reached
+            if up_limit and down_limit:
+                break
             # print(roh)
         print("Done extending ROH", index)
     end_time = time.time()
