@@ -31,6 +31,7 @@ import pandas as pd  # 1.5.3
 import argparse
 from pathlib import Path
 import sys
+from tqdm import tqdm
 
 # remove false positve warning related to chained assignment
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -142,7 +143,7 @@ def find_matches(df):
     # find matches
 
     start_time = time.time()
-    for pair in range(2, len(df.index)):  # number of pairwise comparisons
+    for pair in tqdm(range(2, len(df.index)), ascii="░▒█", leave=True):  # number of pairwise comparisons
         # print(f"Pair {pair}")
         for snp in range(6, len(df.columns)):  # number of snp
             # print(f"SNP number {snp}")
@@ -166,7 +167,7 @@ def find_roh(df):
     indiv_str = "-".join([str(x) for x in df.iloc[1, 0:2].tolist()])
     # print(indiv_str)
     start_time = time.time()
-    for pair in range(2, len(df.index)):  # number of pairwise comparisons
+    for pair in tqdm(range(2, len(df.index)), ascii="░▒█", leave=True):  # number of pairwise comparisons
         ref_str = "-".join([str(x) for x in df.iloc[pair, 0:2].tolist()])
         pair_str = ";".join([indiv_str, ref_str])
         # print("Comparing ", pair_str)
@@ -195,7 +196,7 @@ def find_roh(df):
                         index=[0])
                     roh_df_temp = pd.concat([roh_df_temp, new_row],
                                             ignore_index=True)
-        print(f"Found {roh_found} ROHs in pair {pair_str}.")
+        # print(f"Found {roh_found} ROHs in pair {pair_str}.")
 
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
@@ -232,11 +233,11 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     # find roh that are overlapping
     # extend roh
     # loop through every roh, every row
-    for index, roh in roh_df.iterrows():
+    for index, roh in tqdm(roh_df.iterrows(), ascii="░▒█", total=len(roh_df.index), leave=True):
 
         # print("ROH")
         # print(roh)
-        print("Extending ROH", index)
+        # print("Extending ROH", index)
         up_limit = False
         down_limit = False
         while roh['Mismatch'] <= mismatch_threshold:
@@ -326,7 +327,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
             if up_limit and down_limit:
                 break
             # print(roh)
-        print("Done extending ROH", index)
+        # print("Done extending ROH", index)
     end_time = time.time()
     print(f"Time to extend ROH: {end_time - start_time:.4f}")
     return roh_df
@@ -348,6 +349,9 @@ def eliminate_duplicate_roh(df):
 
 clean_roh_df = eliminate_duplicate_roh(extended_roh_df)
 print(clean_roh_df)
+
+
+
 
 print("------------------------------------")
 end_total_time = time.time()
