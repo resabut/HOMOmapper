@@ -327,9 +327,11 @@ def find_genome_position(df, map_df):
     print("Finding genome position...")
     start_time = time.time()
     for index, roh in tqdm(df.iterrows(), ascii="░▒█", leave=False):
-        df.loc[index, 'First_Genome_Pos'] = map_df.iloc[roh['First_SNP'], 3].astype(int)
-        df.loc[index, 'Last_Genome_Pos'] = map_df.iloc[roh['Last_SNP'], 3].astype(int)
-        # print()
+        df.loc[index, 'First_Genome_Pos'] = map_df.iloc[roh['First_SNP'], 3]
+        df.loc[index, 'Last_Genome_Pos'] = map_df.iloc[roh['Last_SNP'], 3]
+    # genome position to integer
+    df['First_Genome_Pos'] = df['First_Genome_Pos'].astype(int)
+    df['Last_Genome_Pos'] = df['Last_Genome_Pos'].astype(int)
     end_time = time.time()
     print(f"Time to find genome position: {end_time - start_time:.4f}")
     return df
