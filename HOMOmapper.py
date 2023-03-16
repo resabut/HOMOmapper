@@ -91,10 +91,10 @@ ref_map_file = find_map_file(args.ref)
 if args.bash:
     print("Sorting ped files with bash... (Used -b/--bash option)")
     # Define the Bash command to run, including the user input
-    bash_command_indiv = "awk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
-                         + str(args.indiv) + " | tr ' ' '\t' > temp_ind.ped"  # it is a  Path object
-    bash_command_ref = "awk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
-                       + str(args.ref) + " | tr ' ' '\t' > temp_ref.ped"  # it is a  Path object
+    bash_command_indiv = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
+                         + str(args.indiv) + " | tr -s ' ' '\t' | sed 's/\t$//' > temp_ind.ped"  # it is a  Path object
+    bash_command_ref = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
+                       + str(args.ref) + " | tr -s ' ' '\t' | sed 's/\t$//' > temp_ref.ped"  # it is a  Path object
 
     # Run the Bash command and capture its output
     a = subprocess.check_output(bash_command_indiv, shell=True)
@@ -102,7 +102,7 @@ if args.bash:
     # print(sorted)
     args.indiv = Path("temp_ind.ped")
     args.ref = Path("temp_ref.ped")
-
+    # exit()
 # Loads ped file into a pandas dataframe
 indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
 
