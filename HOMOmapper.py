@@ -60,6 +60,7 @@ parser.add_argument('-b', '--bash', action="store_true", help='Use bash to sort 
 
 args = parser.parse_args()
 
+# define basic variables
 start_total_time = time.time()
 # config
 # minimum length of ROH
@@ -67,12 +68,7 @@ min_roh = args.min_roh_length
 # max number of mismatches
 max_mismatch = args.max_mismatch
 
-print("Loading data...")
-
-
-
-
-# find the corresponding map file
+# define functions
 def find_map_file(ped_file):
     map_file = ped_file.with_suffix(".map")  # check fi it works with ped file
     if Path(map_file).is_file():
@@ -83,12 +79,7 @@ def find_map_file(ped_file):
         sys.exit()
     return map_file
 
-
-ind_map_file = find_map_file(args.indiv)
-ref_map_file = find_map_file(args.ref)
-
-# Faster way with bash
-if args.bash:
+def sort_bash():
     print("Sorting ped files with bash... (Used -b/--bash option)")
     # Define the Bash command to run, including the user input
     bash_command_indiv = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
@@ -103,40 +94,26 @@ if args.bash:
     args.indiv = Path("temp_ind.ped")
     args.ref = Path("temp_ref.ped")
     # exit()
-# Loads ped file into a pandas dataframe
-indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
 
-# Loads map file into a pandas dataframe
-indiv_map = pd.read_table(ind_map_file, sep="\t", header=None)
+def create_all_data_df(indiv_map, indiv_ped, ref_ped):
+    # include chromosome information in the ped file
+    empty_cols = dict(zip(range(6), [None] * 6))
+    chr_row = pd.concat([pd.DataFrame(empty_cols, index=[0]), pd.DataFrame(indiv_map[0]).T], axis=1, ignore_index=True)
+    # rename rows
+    chr_row.rename(index={0: "Chromosome"}, inplace=True)
+    indiv_ped.rename(index={0: "Ind"}, inplace=True)
+    # concate the chromosome row and the two ped files
+    all_data_df = pd.concat([chr_row, indiv_ped, ref_ped], axis=0)
+    # make temporary shorter ones, if preferred
+    if args.short:
+        print("Shortening data...")
+        all_data_df = all_data_df.iloc[:, 0:args.short_len]
+    elif args.short_len != 500:  # the user has specified a length but not the short option
+        print("\033[1mIgnoring short length option. Please, use the -s option to shorten the data.\033[0m")
+        print("Continuing...")
+    # print(all_data_df)
+    return all_data_df
 
-# Loads ped file into a pandas dataframe
-ref_ped = pd.read_table(args.ref, sep="\t", header=None)
-
-# Loads map file into a pandas dataframe
-ref_map = pd.read_table(ref_map_file, sep="\t", header=None)
-
-
-# check if map files are the same
-print("Adding chromosome information...")
-
-# include chromosome information in the ped file
-empty_cols = dict(zip(range(6), [None] * 6))
-chr_row = pd.concat([pd.DataFrame(empty_cols, index=[0]), pd.DataFrame(indiv_map[0]).T], axis=1, ignore_index=True)
-# rename rows
-chr_row.rename(index={0: "Chromosome"}, inplace=True)
-indiv_ped.rename(index={0: "Ind"}, inplace=True)
-# concate the chromosome row and the two ped files
-all_data_df = pd.concat([chr_row, indiv_ped, ref_ped], axis=0)
-# make temporary shorter ones, if preferred
-if args.short:
-    print("Shortening data...")
-    all_data_df = all_data_df.iloc[:, 0:args.short_len]
-elif args.short_len != 500:  # the user has specified a length but not the short option
-    print("\033[1mIgnoring short length option. Please, use the -s option to shorten the data.\033[0m")
-    print("Continuing...")
-print(all_data_df)
-
-# this function sorts the snp column content
 def ordersnp(df):
     print("------------------------------------")
     print("Sorting data...")
@@ -151,12 +128,6 @@ def ordersnp(df):
     print(f"Time to sort data: {end_time - start_time:.4f}")
     return df
 
-if not args.bash: # if not using bash, sort the ped files with pandas
-    # sort the ped files
-    all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
-
-
-# find matches
 def find_matches(df):
     print("------------------------------------")
     print("Finding matches...")
@@ -178,10 +149,6 @@ def find_matches(df):
     return matches
 
 
-matches_df = find_matches(all_data_df)
-print(matches_df)
-
-# find homologous regions
 def find_roh(df):
     print("------------------------------------")
     print("Finding ROH...")
@@ -226,15 +193,6 @@ def find_roh(df):
     roh_df_temp[roh_df_temp.columns[1:]] = roh_df_temp[roh_df_temp.columns[1:]].astype(int)
     return roh_df_temp
 
-
-preroh_df = find_roh(matches_df)
-
-
-print(preroh_df)
-
-
-# join overlapping roh
-# find overlapping roh
 def find_overlap_roh(df):
     df['overlap'] = df['Last_SNP'] - df['First_SNP'].shift(-1)
     # if overlap is positive, then the roh are overlapping. If it is 0, they are contiguous
@@ -245,9 +203,6 @@ def find_overlap_roh(df):
     # join roh and evaluate number of mismatches
     # udpate roh table
 
-
-# find_overlap_roh(roh_df)
-# extend the existing roh until threshold
 def extend_roh(roh_df, match_df, mismatch_threshold):
     print("------------------------------------")
     print("Extending ROH...")
@@ -358,11 +313,6 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     print(f"Time to extend ROH: {end_time - start_time:.4f}")
     return roh_df
 
-
-extended_roh_df = extend_roh(preroh_df, matches_df, max_mismatch)
-print(extended_roh_df)
-
-# eliminate duplicate roh
 def eliminate_duplicate_roh(df):
     print("------------------------------------")
     print("Eliminating duplicate ROH...")
@@ -372,42 +322,18 @@ def eliminate_duplicate_roh(df):
     print(f"Time to eliminate duplicate ROH: {end_time - start_time:.4f}")
     return df
 
-
-clean_roh_df = eliminate_duplicate_roh(extended_roh_df)
-print(clean_roh_df)
-
-print(indiv_map)
-# find genome position
 def find_genome_position(df, map_df):
     print("------------------------------------")
     print("Finding genome position...")
     start_time = time.time()
-
-    chr_loci_counts = map_df.iloc[:, 0].value_counts().sort_index()
     for index, roh in tqdm(df.iterrows(), ascii="░▒█", leave=False):
-        # print(roh)
-        # print(roh['Chromosome'])
-        # print(chr_loci_counts[roh['Chromosome']])
-        # print(roh['First_SNP'])
-        # print(roh['Last_SNP'])
-        # print(map_df.iloc[roh['First_SNP'], 3])
-        # print(map_df.iloc[roh['Last_SNP'], 3])
-        # print()
-        df.loc[index, 'First_Genome_Pos'] = int(map_df.iloc[roh['First_SNP'], 3])
-        df.loc[index, 'Last_Genome_Pos'] = int(map_df.iloc[roh['Last_SNP'], 3])
-
-        # print(df.loc[roh[0], 'First_Genome_Pos'])
-        # print(df.loc[roh[0], 'Last_Genome_Pos'])
+        df.loc[index, 'First_Genome_Pos'] = map_df.iloc[roh['First_SNP'], 3].astype(int)
+        df.loc[index, 'Last_Genome_Pos'] = map_df.iloc[roh['Last_SNP'], 3].astype(int)
         # print()
     end_time = time.time()
     print(f"Time to find genome position: {end_time - start_time:.4f}")
     return df
 
-final_df = find_genome_position(clean_roh_df, indiv_map)
-print(final_df)
-
-
-# save to file
 def save_to_file(df, filename):
     print("------------------------------------")
     print("Saving to file...")
@@ -416,6 +342,67 @@ def save_to_file(df, filename):
     end_time = time.time()
     print(f"Time to save to file: {end_time - start_time:.4f}")
 
+### MAIN ###
+print("Loading data...")
+
+# find the corresponding map file
+ind_map_file = find_map_file(args.indiv)
+ref_map_file = find_map_file(args.ref)
+
+# Faster way with bash
+if args.bash:
+    sort_bash()
+
+
+# Loads ped file into a pandas dataframe
+indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
+
+# Loads map file into a pandas dataframe
+indiv_map = pd.read_table(ind_map_file, sep="\t", header=None)
+
+# Loads ped file into a pandas dataframe
+ref_ped = pd.read_table(args.ref, sep="\t", header=None)
+
+# Loads map file into a pandas dataframe
+ref_map = pd.read_table(ref_map_file, sep="\t", header=None)
+
+
+# check if map files are the same
+print("Adding chromosome information...")
+all_data_df=create_all_data_df(indiv_map, indiv_ped, ref_ped)
+
+
+if not args.bash: # if not using bash, sort the ped files with pandas
+    # sort the ped files
+    all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
+
+
+# find matches
+matches_df = find_matches(all_data_df)
+print(matches_df)
+
+# find homologous regions
+preroh_df = find_roh(matches_df)
+print(preroh_df)
+
+# join overlapping roh
+# find overlapping roh
+# find_overlap_roh(roh_df)
+# deprecated
+
+# extend the existing roh until threshold is reached
+extended_roh_df = extend_roh(preroh_df, matches_df, max_mismatch)
+print(extended_roh_df)
+
+# eliminate duplicate roh
+clean_roh_df = eliminate_duplicate_roh(extended_roh_df)
+print(clean_roh_df)
+
+# find genome position
+final_df = find_genome_position(clean_roh_df, indiv_map)
+print(final_df)
+
+# save to file
 save_to_file(final_df, args.out)
 
 print("------------------------------------")
