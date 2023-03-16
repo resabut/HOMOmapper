@@ -223,7 +223,7 @@ def find_roh(df):
 
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
-    roh_df_temp.iloc[:, 1:] = roh_df_temp.iloc[:, 1:].astype(int)
+    roh_df_temp[roh_df_temp.columns[1:]] = roh_df_temp[roh_df_temp.columns[1:]].astype(int)
     return roh_df_temp
 
 
