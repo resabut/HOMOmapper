@@ -1,6 +1,9 @@
 #! /usr/bin/env python3
 """
-usage: HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len]
+Author: Joan Escrivà Font
+Version: 1.0
+
+
 Description: HOMOmapper is a tool for finding homologous regions between two
 individuals. It uses a reference individual to find homologous regions in the
 other individual. The reference individual can be a close relative of the
@@ -9,20 +12,49 @@ sliding window approach to find homologous regions. The window size is set by
 the minimum ROH length. The maximum number of mismatches within the window is
 set by the user. The tool outputs a table with the start and end position of
 the ROHs, the chromosome, the number of mismatches and the length of the ROH.
+
+Usage: python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len] -l min_roh_length -m max_mismatch [-b]
 positional arguments:
     indiv_ped             Individual ped file
     ref_ped               Reference ped file
+required arguments:
+    -l min_roh_length, --min-roh-length min_roh_length
+                            Minimum ROH length. It is used for the length of the sliding window (default: 100)
+    -m max_mismatch, --max-mismatch max_mismatch
+                            Maximum number of mismatches within the sliding window (default: 5)
 optional arguments:
     -h, --help            show this help message and exit
     -o output_txt, --out output_txt
                             Output file (default: out_roh_table.txt)
     -s, --short           Shorten ped files. Useful for testing
     -sl short_len, --short_len short_len
-                            Number of columns (Phenotype + genotype data) to be kept in the shortened ped files. By default, 500 columns. Useful for testing (default: 500)
-    -l min_roh_length, --min-roh-length min_roh_length
-                            Minimum ROH length. It is used for the length of the sliding window (default: 100)
-    -m max_mismatch, --max-mismatch max_mismatch
-                            Maximum number of mismatches within the sliding window (default: 5)
+                            Number of columns (Phenotype + genotype data) to be kept in the shortened ped files.
+                            Useful for testing (default: 500)
+    -b, --bash            Use bash to sort ped files. Faster but requires UNIX, gawk
+
+non-standard dependencies:
+    - pandas 1.5.3
+    - tqdm 4.62.3
+    - argparse 1.4.0
+    - pathlib 1.0.1
+    - sys
+    - subprocess
+    - time
+    - random
+
+Input:
+    - Individual ped file and corresponding map file
+    - Reference ped file and corresponding map file
+    - Minimum ROH length
+    - Maximum number of mismatches within the sliding window
+Output:
+    - Table with all the found ROHs. The table contains the following columns:
+        - Pair of individuals
+        - Chromosome
+        - First SNP
+        - Last SNP
+        - Start position
+        - End position
 
 """
 import random
@@ -34,7 +66,7 @@ import sys
 from tqdm import tqdm
 import subprocess
 
-# remove false positve warning related to chained assignment
+# remove false positive warning related to chained assignment
 pd.options.mode.chained_assignment = None  # default='warn'
 
 # Get argparse arguments
@@ -56,7 +88,7 @@ parser.add_argument('-l', '--min-roh-length',
 parser.add_argument('-m', '--max-mismatch', help='Maximum number of mismatches within an ROH.',
                     type=int, required=True)
 parser.add_argument('-b', '--bash', action="store_true", help='Use bash to sort ped files. '
-                                                              'Faster but requires UNIX', required=False)
+                                                              'Faster but requires UNIX, gawk', required=False)
 
 args = parser.parse_args()
 
@@ -68,6 +100,7 @@ min_roh = args.min_roh_length
 # max number of mismatches
 max_mismatch = args.max_mismatch
 
+
 # define functions
 def find_map_file(ped_file):
     map_file = ped_file.with_suffix(".map")  # check fi it works with ped file
@@ -78,6 +111,7 @@ def find_map_file(ped_file):
         as the .ped file and has the same name. Then, run again.\nExiting...")
         sys.exit()
     return map_file
+
 
 def sort_bash():
     print("Sorting ped files with bash... (Used -b/--bash option)")
@@ -94,6 +128,7 @@ def sort_bash():
     args.indiv = Path("temp_ind.ped")
     args.ref = Path("temp_ref.ped")
     # exit()
+
 
 def create_all_data_df(indiv_map, indiv_ped, ref_ped):
     # include chromosome information in the ped file
@@ -114,6 +149,7 @@ def create_all_data_df(indiv_map, indiv_ped, ref_ped):
     # print(all_data_df)
     return all_data_df
 
+
 def ordersnp(df):
     print("------------------------------------")
     print("Sorting data...")
@@ -127,6 +163,7 @@ def ordersnp(df):
     end_time = time.time()
     print(f"Time to sort data: {end_time - start_time:.4f}")
     return df
+
 
 def find_matches(df):
     print("------------------------------------")
@@ -191,7 +228,14 @@ def find_roh(df):
     end_time = time.time()
     print(f"Time to find ROH: {end_time - start_time:.4f}")
     roh_df_temp[roh_df_temp.columns[1:]] = roh_df_temp[roh_df_temp.columns[1:]].astype(int)
-    return roh_df_temp
+    # check if empty
+    if roh_df_temp.empty:
+        print("No ROH found. Please, check your parameters.\n You might want to lower the window length (-l) or allow "
+              "for more mismatches (-m).")
+        sys.exit()
+    else:  # if not empty, continue to next step
+        return roh_df_temp
+
 
 def find_overlap_roh(df):
     df['overlap'] = df['Last_SNP'] - df['First_SNP'].shift(-1)
@@ -202,6 +246,7 @@ def find_overlap_roh(df):
 
     # join roh and evaluate number of mismatches
     # udpate roh table
+
 
 def extend_roh(roh_df, match_df, mismatch_threshold):
     print("------------------------------------")
@@ -241,7 +286,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                 down_limit = True
                 new_last_snp = num_loci
             # calc mismatch vals for new positions
-            #check for NA values
+            # check for NA values
             # print("Checking for NA values")
             # print(chr_df.isna(), chr_df.isnull())
             # print(num_loci)
@@ -285,7 +330,8 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     roh['First_SNP'] = new_first_snp
                     roh['Last_SNP'] = new_last_snp
                     roh['Mismatch'] = roh["Mismatch"] + up_mismatch + down_mismatch
-                elif roh["Mismatch"] + 1 <= mismatch_threshold:  # extending both ends exceeds the threshold, but one doesn't
+                elif roh[
+                    "Mismatch"] + 1 <= mismatch_threshold:  # extending both ends exceeds the threshold, but one doesn't
                     # extend only one end, choose randomly
                     if random.randint(0, 1) and not up_limit:  # up, and upstream limit not reached
                         roh['First_SNP'] = new_first_snp
@@ -313,6 +359,7 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
     print(f"Time to extend ROH: {end_time - start_time:.4f}")
     return roh_df
 
+
 def eliminate_duplicate_roh(df):
     print("------------------------------------")
     print("Eliminating duplicate ROH...")
@@ -321,6 +368,7 @@ def eliminate_duplicate_roh(df):
     end_time = time.time()
     print(f"Time to eliminate duplicate ROH: {end_time - start_time:.4f}")
     return df
+
 
 def find_genome_position(df, map_df):
     print("------------------------------------")
@@ -336,6 +384,7 @@ def find_genome_position(df, map_df):
     print(f"Time to find genome position: {end_time - start_time:.4f}")
     return df
 
+
 def save_to_file(df, filename):
     print("------------------------------------")
     print("Saving to file...")
@@ -343,6 +392,7 @@ def save_to_file(df, filename):
     df.to_csv(filename, sep='\t', index=False)
     end_time = time.time()
     print(f"Time to save to file: {end_time - start_time:.4f}")
+
 
 ### MAIN ###
 print("Loading data...")
@@ -354,7 +404,6 @@ ref_map_file = find_map_file(args.ref)
 # Faster way with bash
 if args.bash:
     sort_bash()
-
 
 # Loads ped file into a pandas dataframe
 indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
@@ -368,16 +417,13 @@ ref_ped = pd.read_table(args.ref, sep="\t", header=None)
 # Loads map file into a pandas dataframe
 ref_map = pd.read_table(ref_map_file, sep="\t", header=None)
 
-
 # check if map files are the same
 print("Adding chromosome information...")
-all_data_df=create_all_data_df(indiv_map, indiv_ped, ref_ped)
+all_data_df = create_all_data_df(indiv_map, indiv_ped, ref_ped)
 
-
-if not args.bash: # if not using bash, sort the ped files with pandas
+if not args.bash:  # if not using bash, sort the ped files with pandas
     # sort the ped files
     all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
-
 
 # find matches
 matches_df = find_matches(all_data_df)
