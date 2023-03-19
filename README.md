@@ -11,7 +11,7 @@ It is applicable for various scenarios, where the reference individual could be 
 ## Usage
 
 ```bash
-python3 OMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len] -l min_roh_length -m max_mismatch [-b]
+python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len] -l min_roh_length -m max_mismatch [-b]
 ```
 #### Positional Arguments:
 - indiv_ped: Individual ped file
@@ -43,8 +43,8 @@ For the quicker bash sorting, gawk is required. If not installed, it can be inst
 sudo apt-get install gawk
 ```
 
-## Example
-### 1. Example 1
+## Example runs
+### Example 1
 This dataset contains data for 4 individuals (3 reference individuals and 1 individual to be compared) that are
 closely related, they belong to the same population (Tuscany).
 It can be used to test the tool and to understand the output as following:
@@ -59,7 +59,7 @@ This runs the tool with the following parameters:
 - Maximum number of mismatches: 5
 - Bash sorting: True
 
-### 2. Example 2
+### Example 2
 This dataset contains data for 5 individuals (4 reference individuals and 1 individual to be compared) that are not
 closely related, they belong to different populations (Tuscany, Palestine, Yemen, Hungary and Crete).
 It can be used to test the tool and to understand the output as following:

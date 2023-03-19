@@ -389,6 +389,8 @@ def save_to_file(df, filename):
     print("------------------------------------")
     print("Saving to file...")
     start_time = time.time()
+    # delete mismatch column
+    df = df.drop(columns=['Mismatch'])
     df.to_csv(filename, sep='\t', index=False)
     end_time = time.time()
     print(f"Time to save to file: {end_time - start_time:.4f}")
