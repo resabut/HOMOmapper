@@ -2,7 +2,8 @@
 Author: Joan Escrivà Font  
 Version: 1.0
 ## Description
-HOMOmapper is a powerful tool that enables the identification of homologous regions between one individual and a list of references. This homologous regionsand termed ROH (runs of homology).
+HOMOmapper is a powerful tool that enables the identification of homologous regions between one individual and a list of references.
+This homologous regions are termed ROH (runs of homology).
 
 By using a reference individual, it locates homologous regions in the other individual using a sliding window approach, with the window size determined by the minimum ROH length.
 The tool allows users to set the maximum number of mismatches within the window, and generates a table with essential information including the start and end position of ROHs, the chromosome, number of mismatches, and ROH length.

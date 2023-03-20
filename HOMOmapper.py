@@ -13,7 +13,8 @@ the minimum ROH length. The maximum number of mismatches within the window is
 set by the user. The tool outputs a table with the start and end position of
 the ROHs, the chromosome, the number of mismatches and the length of the ROH.
 
-Usage: python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len] -l min_roh_length -m max_mismatch [-b]
+Usage: python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len]
+ -l min_roh_length -m max_mismatch [-b]
 positional arguments:
     indiv_ped             Individual ped file
     ref_ped               Reference ped file
@@ -89,7 +90,7 @@ parser.add_argument('-m', '--max-mismatch', help='Maximum number of mismatches w
                     type=int, required=True)
 parser.add_argument('-b', '--bash', action="store_true", help='Use bash to sort ped files. '
                                                               'Faster but requires UNIX, gawk', required=False)
-
+parser.add_argument('--force-sort', action="store_true", help='Force sorting of ped files.')
 args = parser.parse_args()
 
 # define basic variables
@@ -99,6 +100,8 @@ start_total_time = time.time()
 min_roh = args.min_roh_length
 # max number of mismatches
 max_mismatch = args.max_mismatch
+# run sorting, used in reruns
+run_sorting = True
 
 
 # define functions
@@ -116,19 +119,35 @@ def find_map_file(ped_file):
 def sort_bash():
     print("Sorting ped files with bash... (Used -b/--bash option)")
     # Define the Bash command to run, including the user input
-    bash_command_indiv = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
-                         + str(args.indiv) + " | tr -s ' ' '\t' | sed 's/\t$//' > temp_ind.ped"  # it is a  Path object
-    bash_command_ref = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(a);j++) { $i=$i\"\"a[j]; } }}1' " \
+    bash_command_indiv = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(" \
+                         "a);j++) { $i=$i\"\"a[j]; } }}1' " \
+                         + str(args.indiv) + " | tr -s ' ' '\t' | sed 's/\t$//' > temp_indiv.ped"  # it is a  Path object
+    bash_command_ref = "gawk -F '\\t' '{for(i=7;i<=NF;i++) {split($i,a,\"\"); asort(a); $i=\"\"; for(j=1;j<=length(" \
+                       "a);j++) { $i=$i\"\"a[j]; } }}1' " \
                        + str(args.ref) + " | tr -s ' ' '\t' | sed 's/\t$//' > temp_ref.ped"  # it is a  Path object
 
     # Run the Bash command and capture its output
     a = subprocess.check_output(bash_command_indiv, shell=True)
     b = subprocess.check_output(bash_command_ref, shell=True)
     # print(sorted)
-    args.indiv = Path("temp_ind.ped")
+    args.indiv = Path("temp_indiv.ped")
     args.ref = Path("temp_ref.ped")
+    print("Two temporary ped files were created: temp_indiv.ped and temp_ref.ped.\nThey can be reused in further "
+          "reruns")
     # exit()
 
+
+
+def y_n_input(question):
+    while True:
+        answer = input(question + " (y/n): ").lower()
+        if answer in ("y", "n"):
+            if answer == "y":
+                return True
+            if answer == "n":
+                return False
+        else:
+            print("Please enter y or n.")
 
 def create_all_data_df(indiv_map, indiv_ped, ref_ped):
     # include chromosome information in the ped file
@@ -305,7 +324,8 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     # print("good down")
                     roh['Last_SNP'] = new_last_snp
                     roh['Mismatch'] = roh["Mismatch"] + down_mismatch  # update mismatch in case it is 1
-                elif up_limit:  # the snp downstream is a mismatch and the threshold is exceeded and the upstream limit is reached
+                elif up_limit:
+                    # the snp downstream is a mismatch and the threshold is exceeded and the upstream limit is reached
                     # print("bad down")
                     break
             elif down_mismatch == 0:  # the snp downstream is a match, but the upstream is a mismatch
@@ -330,8 +350,8 @@ def extend_roh(roh_df, match_df, mismatch_threshold):
                     roh['First_SNP'] = new_first_snp
                     roh['Last_SNP'] = new_last_snp
                     roh['Mismatch'] = roh["Mismatch"] + up_mismatch + down_mismatch
-                elif roh[
-                    "Mismatch"] + 1 <= mismatch_threshold:  # extending both ends exceeds the threshold, but one doesn't
+                elif roh["Mismatch"] + 1 <= mismatch_threshold:
+                    # extending both ends exceeds the threshold, but one doesn't
                     # extend only one end, choose randomly
                     if random.randint(0, 1) and not up_limit:  # up, and upstream limit not reached
                         roh['First_SNP'] = new_first_snp
@@ -403,9 +423,20 @@ print("Loading data...")
 ind_map_file = find_map_file(args.indiv)
 ref_map_file = find_map_file(args.ref)
 
-# Faster way with bash
-if args.bash:
+# check if temporary files exist
+if args.force_sort:  # force sorting chosen by user
+    print("Forcing sorting...")
+    run_sorting = True
+elif Path("temp_indiv.ped").is_file() and Path("temp_ref.ped").is_file():
+    # ask if the user wants to rerun the sorting
+    run_sorting = y_n_input("Pre-sorted files already exist, do you want to rerun the sorting? ")
+    print("Sorting can be forced with the --force_sort flag.")
+
+if not run_sorting:  # don't run sorting
+    print("Loading pre-sorted files and skipping sorting...")
+elif run_sorting and args.bash:  # run sorting with bash
     sort_bash()
+
 
 # Loads ped file into a pandas dataframe
 indiv_ped = pd.read_table(args.indiv, sep="\t", header=None)
@@ -419,11 +450,16 @@ ref_ped = pd.read_table(args.ref, sep="\t", header=None)
 # Loads map file into a pandas dataframe
 ref_map = pd.read_table(ref_map_file, sep="\t", header=None)
 
+# check if map files contain the same information
+if not indiv_map.equals(ref_map):
+    print("Map files do not contain the same information, exiting...")
+    exit()
+
 # check if map files are the same
 print("Adding chromosome information...")
 all_data_df = create_all_data_df(indiv_map, indiv_ped, ref_ped)
 
-if not args.bash:  # if not using bash, sort the ped files with pandas
+if not args.bash and run_sorting:  # if not using bash, sort the ped files with pandas
     # sort the ped files
     all_data_df.iloc[1:, :] = ordersnp(all_data_df.iloc[1:, :])
 
