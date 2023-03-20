@@ -12,7 +12,7 @@ It is applicable for various scenarios, where the reference individual could be 
 ## Usage
 
 ```bash
-python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len] -l min_roh_length -m max_mismatch [-b]
+python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len] -l min_roh_length -m max_mismatch [-b] [--force-sort] [--overwrite]
 ```
 #### Positional Arguments:
 - indiv_ped: Individual ped file
@@ -26,6 +26,8 @@ python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl sho
 - -s, --short: Shorten ped files. Useful for testing
 - -sl short_len, --short_len short_len: Number of columns (Phenotype + genotype data) to be kept in the shortened ped files. Useful for testing (default: 500)
 - -b, --bash: Use bash to sort ped files. Faster but requires UNIX, gawk
+- --force-sort:          Force sorting of ped files. 
+- --overwrite:           Overwrite output file if it exists.
 
 
 ## Installation

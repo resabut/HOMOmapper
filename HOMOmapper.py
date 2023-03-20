@@ -14,7 +14,7 @@ set by the user. The tool outputs a table with the start and end position of
 the ROHs, the chromosome, the number of mismatches and the length of the ROH.
 
 Usage: python3 HOMOmapper.py [-h] -i indiv_ped -r ref_ped [-o output_txt] [-s] [-sl short_len]
- -l min_roh_length -m max_mismatch [-b]
+ -l min_roh_length -m max_mismatch [-b] [--force-sort] [--overwrite]
 positional arguments:
     indiv_ped             Individual ped file
     ref_ped               Reference ped file
@@ -32,6 +32,8 @@ optional arguments:
                             Number of columns (Phenotype + genotype data) to be kept in the shortened ped files.
                             Useful for testing (default: 500)
     -b, --bash            Use bash to sort ped files. Faster but requires UNIX, gawk
+    --force-sort          Force sorting of ped files.
+    --overwrite           Overwrite output file if it exists.
 
 non-standard dependencies:
     - pandas 1.5.3
@@ -91,6 +93,7 @@ parser.add_argument('-m', '--max-mismatch', help='Maximum number of mismatches w
 parser.add_argument('-b', '--bash', action="store_true", help='Use bash to sort ped files. '
                                                               'Faster but requires UNIX, gawk', required=False)
 parser.add_argument('--force-sort', action="store_true", help='Force sorting of ped files.')
+parser.add_argument('--overwrite', action="store_true", help='Overwrite output file if it exists.')
 args = parser.parse_args()
 
 # define basic variables
@@ -136,7 +139,21 @@ def sort_bash():
           "reruns")
     # exit()
 
-
+# function that cheks if user wants to overwrite a file
+def overwrite_file(file):
+    while True:
+        answer = input(f"{file} already exists. Do you want to overwrite it? (y/n): ").lower()
+        if answer in ("y", "n"):
+            if answer == "y":
+                return True
+            if answer == "n":
+                newname = input("Please, enter a new name/path for the file: ")
+                if newname == f"{file}":
+                    print("Please, enter a different name/path for the file.")
+                else:
+                    return newname
+        else:
+            print("Please enter y or n.")
 
 def y_n_input(question):
     while True:
@@ -417,6 +434,16 @@ def save_to_file(df, filename):
 
 
 ### MAIN ###
+# check if overwrite
+if not args.overwrite and Path(args.out).is_file():
+    overwrite = overwrite_file(args.out)
+    if overwrite == True:
+        pass
+    else:  # the user doesn't want to overwrite the file
+        print("Updating output file name...")
+        args.out = overwrite
+
+
 print("Loading data...")
 
 # find the corresponding map file
