@@ -428,6 +428,10 @@ def save_to_file(df, filename):
     start_time = time.time()
     # delete mismatch column
     df = df.drop(columns=['Mismatch'])
+    # add ROH length column
+    df['Length'] = df['Last_Genome_Pos'] - df['First_Genome_Pos'] + 1
+    # add number of SNPs column
+    df['Number_of_SNPs'] = df['Last_SNP'] - df['First_SNP'] + 1
     df.to_csv(filename, sep='\t', index=False)
     end_time = time.time()
     print(f"Time to save to file: {end_time - start_time:.4f}")
